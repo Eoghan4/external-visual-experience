@@ -130,6 +130,7 @@ def main() -> None:
             consecutive_failures = 0
 
             width = terminal_ascii_width(args.scale)
+            frame = cv2.flip(frame, 1)
             art = frame_to_ascii(frame, width)
 
             # Move cursor to top-left and redraw the current frame.
