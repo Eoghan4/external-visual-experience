@@ -137,20 +137,19 @@ PROGRAMMES = [
         "detail": "OpenCV window  │  Q to stop",
     },
     {
-        "id":     "both",
-        "name":   "BOTH",
-        "desc":   "Launch Wireframe now, ASCII Cam in a new terminal window",
-        "detail": "Wireframe + ASCII Cam launched simultaneously",
+        "id":     "poll",
+        "name":   "POLL",
+        "desc":   "Two-choice live poll — raise left or right hand to vote",
+        "detail": "Two OpenCV windows  │  Q to stop",
     },
 ]
 
 # Which section the cursor is in: "prog" | "cam_ascii" | "cam_wire" | "display"
-# For "both" mode there are two independent camera pickers.
 # Navigation order depends on selected programme.
 SECTION_ORDER = {
     "ascii": ["prog", "cam_ascii", "display"],
     "wire":  ["prog", "cam_wire",  "display"],
-    "both":  ["prog", "cam_ascii", "cam_wire", "display"],
+    "poll":  ["prog", "cam_poll",  "display"],
 }
 
 
@@ -213,9 +212,9 @@ def render(state):
         lines.append(f"  {YELLOW}⚠  No cameras detected.{RESET}")
         lines.append("")
     else:
-        cam_sections = [s for s in ["cam_ascii", "cam_wire"] if s in sections]
-        cam_labels   = {"cam_ascii": "ASCII CAM CAMERA", "cam_wire": "WIREFRAME CAMERA"}
-        cam_keys     = {"cam_ascii": "cam_ascii", "cam_wire": "cam_wire"}
+        cam_sections = [s for s in ["cam_ascii", "cam_wire", "cam_poll"] if s in sections]
+        cam_labels   = {"cam_ascii": "ASCII CAM CAMERA", "cam_wire": "WIREFRAME CAMERA", "cam_poll": "POLL CAMERA"}
+        cam_keys     = {"cam_ascii": "cam_ascii", "cam_wire": "cam_wire", "cam_poll": "cam_poll"}
 
         for sec_key in cam_sections:
             sec_active = active == sec_key
@@ -268,16 +267,6 @@ def render(state):
         lines.append("")
 
     # ── Warnings ─────────────────────────────────────────────────────────────
-    if prog_id == "both" and cameras:
-        ascii_cam = cameras[state["cam_ascii"]]
-        wire_cam  = cameras[state["cam_wire"]]
-        if ascii_cam == wire_cam:
-            lines.append(
-                f"  {YELLOW}⚠  Both programmes are set to {camera_label(ascii_cam)} "
-                f"[{ascii_cam}]. One may fail to open.{RESET}"
-            )
-            lines.append("")
-
     lines.append(f"  {DARK_GRAY}Tab to switch section  │  Enter to launch  │  Esc to quit{RESET}")
     print("\n".join(lines), end="", flush=True)
 
@@ -333,6 +322,17 @@ def launch_wireframe(camera_idx, monitor=None, monitors=None):
         ).start()
 
 
+def launch_poll(camera_idx, left_choice, right_choice, monitor=None, monitors=None):
+    script = os.path.join(SCRIPT_DIR, "poll.py")
+    _open_new_window(
+        "Poll",
+        script,
+        ["--camera", str(camera_idx), "--left", f'"{left_choice}"', "--right", f'"{right_choice}"'],
+        monitor,
+        monitors,
+    )
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     enable_ansi()
@@ -354,6 +354,7 @@ def main():
         "prog":     0,
         "cam_ascii": default_pos,
         "cam_wire":  default_pos,
+        "cam_poll":  default_pos,
         "display":  0,
         "section":  "prog",
         "cameras":  cameras,
@@ -389,7 +390,7 @@ def main():
                 state["prog"] = (state["prog"] + 1) % len(PROGRAMMES)
                 state["section"] = "prog"
 
-        elif cur in ("cam_ascii", "cam_wire"):
+        elif cur in ("cam_ascii", "cam_wire", "cam_poll"):
             if key == "LEFT":
                 state[cur] = (state[cur] - 1) % len(cameras)
             elif key == "RIGHT":
@@ -406,14 +407,22 @@ def main():
             mon       = state["display"] if len(monitors) > 1 else None
             ascii_cam = cameras[state["cam_ascii"]] if cameras else 1
             wire_cam  = cameras[state["cam_wire"]]  if cameras else 1
+            poll_cam  = cameras[state["cam_poll"]]  if cameras else 1
 
             if prog_id == "ascii":
                 launch_ascii(ascii_cam, mon, monitors)
             elif prog_id == "wire":
                 launch_wireframe(wire_cam, mon, monitors)
-            elif prog_id == "both":
-                launch_wireframe(wire_cam, mon, monitors)
-                launch_ascii(ascii_cam, mon, monitors)
+            elif prog_id == "poll":
+                # Restore cursor and prompt for choices
+                print(CLEAR_SCREEN + SHOW_CURSOR, end="", flush=True)
+                print(f"\n  {BOLD}{WHITE}POLL SETUP{RESET}\n")
+                print(f"  {CYAN}Enter the two choices for your poll.{RESET}\n")
+                left_choice  = input(f"  {GREEN}Left hand choice :{RESET}  ").strip() or "LEFT"
+                right_choice = input(f"  {GREEN}Right hand choice:{RESET}  ").strip() or "RIGHT"
+                print(f"\n  {DARK_GRAY}Launching poll...{RESET}\n")
+                launch_poll(poll_cam, left_choice, right_choice, mon, monitors)
+                print(HIDE_CURSOR, end="", flush=True)
 
             state["section"] = "prog"
 

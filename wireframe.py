@@ -28,10 +28,12 @@ hand_opts = vision.HandLandmarkerOptions(
 face_opts = vision.FaceLandmarkerOptions(
     base_options=mp.tasks.BaseOptions(model_asset_path="face_landmarker.task"),
     running_mode=RunningMode.VIDEO,
+    num_faces=4,
 )
 pose_opts = vision.PoseLandmarkerOptions(
     base_options=mp.tasks.BaseOptions(model_asset_path="pose_landmarker.task"),
     running_mode=RunningMode.VIDEO,
+    num_poses=4,
 )
 
 hand_landmarker = vision.HandLandmarker.create_from_options(hand_opts)
@@ -112,12 +114,14 @@ def draw_hud(img, has_face, has_hands, has_body):
     # --- status labels (top-left) ---
     labels = []
     if has_face:
-        labels.append("FACE DETECTED")
+        count = has_face
+        labels.append(f"FACE{'S' if count > 1 else ''} DETECTED ({count})")
     if has_hands:
         count = has_hands
         labels.append(f"HAND{'S' if count > 1 else ''} DETECTED ({count})")
     if has_body:
-        labels.append("PERSON DETECTED")
+        count = has_body
+        labels.append(f"PERSON{'S' if count > 1 else ''} DETECTED ({count})")
 
     for i, text in enumerate(labels):
         y = 30 + i * 28
@@ -209,9 +213,9 @@ while cap.isOpened():
 
     draw_hud(
         out,
-        has_face=len(face_result.face_landmarks) > 0,
+        has_face=len(face_result.face_landmarks),
         has_hands=len(hand_result.hand_landmarks),
-        has_body=len(pose_result.pose_landmarks) > 0,
+        has_body=len(pose_result.pose_landmarks),
     )
 
     cv2.imshow("Wireframe", out)
