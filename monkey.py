@@ -213,16 +213,14 @@ def _draw_centered(img, text, y, scale, color, thickness):
     _draw_text(img, text, (img.shape[1] - tw) // 2, y, scale, color, thickness)
 
 
-def draw_frame(img, bananas, total_bananas, face_result, pose_result):
+def draw_frame(img, bananas, face_result, pose_result):
     fh, fw = img.shape[:2]
 
     # ── Bananas ────────────────────────────────────────────────────────────────
     for b in bananas:
         bw = b.w
         bh = b.h
-        # Draw resized banana (non-square: resize to bw wide, then overlay)
         s = cv2.resize(_banana_src, (bw, bh), interpolation=cv2.INTER_AREA)
-        # Rotate
         diag = int(math.hypot(bw, bh)) + 2
         canvas_s = np.zeros((diag, diag, 4), dtype=np.uint8)
         ox, oy   = (diag - bw) // 2, (diag - bh) // 2
@@ -230,7 +228,6 @@ def draw_frame(img, bananas, total_bananas, face_result, pose_result):
         M  = cv2.getRotationMatrix2D((diag / 2, diag / 2), b.angle, 1.0)
         rs = cv2.warpAffine(canvas_s, M, (diag, diag), flags=cv2.INTER_LINEAR,
                             borderMode=cv2.BORDER_CONSTANT, borderValue=(0,0,0,0))
-        # Paste onto frame
         cx, cy = int(b.x), int(b.y)
         _paste_bgra(img, rs, cx - diag // 2, cy - diag // 2)
 
@@ -239,14 +236,37 @@ def draw_frame(img, bananas, total_bananas, face_result, pose_result):
         cx, cy, size, angle = _face_params(lms, fw, fh)
         _overlay_sprite(img, _monkey_src, cx, cy, size, angle)
 
-    # ── HUD ───────────────────────────────────────────────────────────────────
-    bar_h = 54
-    bar   = img[:bar_h].copy()
-    cv2.rectangle(img, (0, 0), (fw, bar_h), (0, 0, 0), -1)
-    cv2.addWeighted(bar, 0.35, img[:bar_h], 0.65, 0, img[:bar_h])
 
-    _draw_text(img, f"BANANAS EATEN: {total_bananas}", 14, 36, 1.1, (0, 210, 255), 2)
+# ── Score window ───────────────────────────────────────────────────────────────
+SW, SH         = 1920, 1080
+_score_canvas  = np.zeros((SH, SW, 3), dtype=np.uint8)
+_BANANA_DISP_W = 140  # display width for scattered bananas on score screen
 
+# Pre-compute scattered banana positions once (randomised, stable each run)
+# Keep bananas outside the centre panel area (1280×280 centred in 1920×1080)
+_PANEL_X0 = (1920 - 1280) // 2 - 20
+_PANEL_X1 = _PANEL_X0 + 1280 + 40
+_PANEL_Y0 = (1080 - 280) // 2 - 20
+_PANEL_Y1 = _PANEL_Y0 + 280 + 40
+
+random.seed(42)
+_scattered = []
+attempts   = 0
+while len(_scattered) < 28 and attempts < 2000:
+    attempts += 1
+    bw = _BANANA_DISP_W
+    bh = int(bw * (_banana_src.shape[0] / _banana_src.shape[1]))
+    x  = random.randint(bw, SW - bw)
+    y  = random.randint(bh, SH - bh)
+    # reject if centre overlaps the panel
+    if _PANEL_X0 < x < _PANEL_X1 and _PANEL_Y0 < y < _PANEL_Y1:
+        continue
+    _scattered.append({
+        "x": x, "y": y,
+        "angle": random.uniform(0, 360),
+        "bw": bw, "bh": bh,
+    })
+random.seed()   # restore random state
 
 def _paste_bgra(canvas, sprite_bgra, x0, y0):
     """Paste a BGRA sprite onto a BGR canvas at top-left (x0, y0)."""
@@ -269,6 +289,54 @@ def _paste_bgra(canvas, sprite_bgra, x0, y0):
     canvas[dy0:dy1, dx0:dx1] = (bgr * a + canvas[dy0:dy1, dx0:dx1] * (1 - a)).astype(np.uint8)
 
 
+# Pre-render each scattered banana (they don't move)
+_banana_sprites = []
+for sc in _scattered:
+    bw, bh = sc["bw"], sc["bh"]
+    s    = cv2.resize(_banana_src, (bw, bh), interpolation=cv2.INTER_AREA)
+    diag = int(math.hypot(bw, bh)) + 2
+    buf  = np.zeros((diag, diag, 4), dtype=np.uint8)
+    ox, oy = (diag - bw) // 2, (diag - bh) // 2
+    buf[oy:oy+bh, ox:ox+bw] = s
+    M   = cv2.getRotationMatrix2D((diag / 2, diag / 2), sc["angle"], 1.0)
+    rot = cv2.warpAffine(buf, M, (diag, diag), flags=cv2.INTER_LINEAR,
+                         borderMode=cv2.BORDER_CONSTANT, borderValue=(0,0,0,0))
+    _banana_sprites.append((sc["x"], sc["y"], diag, rot))
+
+# Bake static background: bananas + panel + label — never redrawn
+_score_bg = np.full((SH, SW, 3), (20, 15, 10), dtype=np.uint8)
+for x, y, diag, sprite in _banana_sprites:
+    _paste_bgra(_score_bg, sprite, x - diag // 2, y - diag // 2)
+pw, ph = 1280, 280
+px, py = (SW - pw) // 2, (SH - ph) // 2
+cv2.rectangle(_score_bg, (px, py), (px + pw, py + ph), (18, 14, 8), -1)
+cv2.rectangle(_score_bg, (px, py), (px + pw, py + ph), (0, 180, 220), 2)
+_label = "ALL TIME TOTAL BANANAS:"
+(lw, _), _ = cv2.getTextSize(_label, FONT, 1.8, 3)
+cv2.putText(_score_bg, _label, ((SW - lw) // 2, SH // 2 - 30), FONT, 1.8, (0, 0, 0),   6, cv2.LINE_AA)
+cv2.putText(_score_bg, _label, ((SW - lw) // 2, SH // 2 - 30), FONT, 1.8, (0, 210, 255), 3, cv2.LINE_AA)
+
+# Number region we'll overwrite each frame — pre-compute its bounds
+_NUM_Y   = SH // 2 + 110
+_NUM_CLEAR_Y0 = _NUM_Y - 120
+_NUM_CLEAR_Y1 = _NUM_Y + 20
+
+
+def draw_score_window(total_bananas):
+    img = _score_canvas
+    np.copyto(img, _score_bg)   # single memcpy — fast
+
+    # Only the number changes frame-to-frame
+    count = str(total_bananas)
+    (cw, _), _ = cv2.getTextSize(count, FONT, 5.5, 8)
+    cv2.putText(img, count, ((SW - cw) // 2, _NUM_Y), FONT, 5.5, (0, 0, 0),   14, cv2.LINE_AA)
+    cv2.putText(img, count, ((SW - cw) // 2, _NUM_Y), FONT, 5.5, (0, 220, 255), 8, cv2.LINE_AA)
+
+    return img
+
+
+
+
 # ── Main loop ──────────────────────────────────────────────────────────────────
 cap = cv2.VideoCapture(_args.camera)
 
@@ -278,7 +346,9 @@ next_spawn    = time.time() + 1.0
 timestamp_ms  = 0
 prev_time     = time.time()
 
-cv2.namedWindow("Monkey Mode", cv2.WINDOW_NORMAL)
+cv2.namedWindow("Monkey Mode",   cv2.WINDOW_NORMAL)
+cv2.namedWindow("Banana Count",  cv2.WINDOW_NORMAL)
+cv2.resizeWindow("Banana Count", 1920, 1080)
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -317,8 +387,9 @@ while cap.isOpened():
 
     bananas = [b for b in bananas if not b.off_screen(fh) and not b.eaten]
 
-    draw_frame(frame, bananas, total_bananas, face_result, pose_result)
-    cv2.imshow("Monkey Mode", frame)
+    draw_frame(frame, bananas, face_result, pose_result)
+    cv2.imshow("Monkey Mode",  frame)
+    cv2.imshow("Banana Count", draw_score_window(total_bananas))
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
