@@ -154,16 +154,23 @@ PROGRAMMES = [
         "desc":   "Monkey masks on faces, catch falling bananas with your body",
         "detail": "One OpenCV window  │  Q to stop",
     },
+    {
+        "id":     "gif_slider",
+        "name":   "GIF SLIDER",
+        "desc":   "Before/after GIF comparison — move hand left/right to slide",
+        "detail": "One OpenCV window  │  Q to stop",
+    },
 ]
 
 # Which section the cursor is in: "prog" | "cam_ascii" | "cam_wire" | "display"
 # Navigation order depends on selected programme.
 SECTION_ORDER = {
-    "ascii": ["prog", "cam_ascii", "display"],
-    "wire":  ["prog", "cam_wire",  "display"],
-    "poll":  ["prog", "cam_poll",  "display"],
-    "fruit":  ["prog", "cam_fruit",  "display"],
-    "monkey": ["prog", "cam_monkey", "display"],
+    "ascii":      ["prog", "cam_ascii",      "display"],
+    "wire":       ["prog", "cam_wire",       "display"],
+    "poll":       ["prog", "cam_poll",       "display"],
+    "fruit":      ["prog", "cam_fruit",      "display"],
+    "monkey":     ["prog", "cam_monkey",     "display"],
+    "gif_slider": ["prog", "cam_gif_slider", "display"],
 }
 
 
@@ -226,9 +233,9 @@ def render(state):
         lines.append(f"  {YELLOW}⚠  No cameras detected.{RESET}")
         lines.append("")
     else:
-        cam_sections = [s for s in ["cam_ascii", "cam_wire", "cam_poll", "cam_fruit", "cam_monkey"] if s in sections]
-        cam_labels   = {"cam_ascii": "ASCII CAM CAMERA", "cam_wire": "WIREFRAME CAMERA", "cam_poll": "POLL CAMERA", "cam_fruit": "FRUIT NINJA CAMERA", "cam_monkey": "MONKEY MODE CAMERA"}
-        cam_keys     = {"cam_ascii": "cam_ascii", "cam_wire": "cam_wire", "cam_poll": "cam_poll", "cam_fruit": "cam_fruit", "cam_monkey": "cam_monkey"}
+        cam_sections = [s for s in ["cam_ascii", "cam_wire", "cam_poll", "cam_fruit", "cam_monkey", "cam_gif_slider"] if s in sections]
+        cam_labels   = {"cam_ascii": "ASCII CAM CAMERA", "cam_wire": "WIREFRAME CAMERA", "cam_poll": "POLL CAMERA", "cam_fruit": "FRUIT NINJA CAMERA", "cam_monkey": "MONKEY MODE CAMERA", "cam_gif_slider": "GIF SLIDER CAMERA"}
+        cam_keys     = {"cam_ascii": "cam_ascii", "cam_wire": "cam_wire", "cam_poll": "cam_poll", "cam_fruit": "cam_fruit", "cam_monkey": "cam_monkey", "cam_gif_slider": "cam_gif_slider"}
 
         for sec_key in cam_sections:
             sec_active = active == sec_key
@@ -357,6 +364,11 @@ def launch_monkey(camera_idx, monitor=None, monitors=None):
     _open_new_window("Monkey Mode", script, ["--camera", str(camera_idx)], monitor, monitors)
 
 
+def launch_gif_slider(camera_idx, monitor=None, monitors=None):
+    script = os.path.join(SCRIPT_DIR, "gif_slider.py")
+    _open_new_window("GIF Slider", script, ["--camera", str(camera_idx)], monitor, monitors)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     enable_ansi()
@@ -376,11 +388,12 @@ def main():
 
     state = {
         "prog":       0,
-        "cam_ascii":  default_pos,
-        "cam_wire":   default_pos,
-        "cam_poll":   default_pos,
-        "cam_fruit":  default_pos,
-        "cam_monkey": default_pos,
+        "cam_ascii":      default_pos,
+        "cam_wire":       default_pos,
+        "cam_poll":       default_pos,
+        "cam_fruit":      default_pos,
+        "cam_monkey":     default_pos,
+        "cam_gif_slider": default_pos,
         "display":    0,
         "section":    "prog",
         "cameras":    cameras,
@@ -416,7 +429,7 @@ def main():
                 state["prog"] = (state["prog"] + 1) % len(PROGRAMMES)
                 state["section"] = "prog"
 
-        elif cur in ("cam_ascii", "cam_wire", "cam_poll", "cam_fruit", "cam_monkey"):
+        elif cur in ("cam_ascii", "cam_wire", "cam_poll", "cam_fruit", "cam_monkey", "cam_gif_slider"):
             if key == "LEFT":
                 state[cur] = (state[cur] - 1) % len(cameras)
             elif key == "RIGHT":
@@ -431,11 +444,12 @@ def main():
         if key == "ENTER":
             prog_id   = PROGRAMMES[state["prog"]]["id"]
             mon       = state["display"] if len(monitors) > 1 else None
-            ascii_cam  = cameras[state["cam_ascii"]] if cameras else 1
-            wire_cam   = cameras[state["cam_wire"]]  if cameras else 1
-            poll_cam   = cameras[state["cam_poll"]]  if cameras else 1
-            fruit_cam  = cameras[state["cam_fruit"]]  if cameras else 1
-            monkey_cam = cameras[state["cam_monkey"]] if cameras else 1
+            ascii_cam       = cameras[state["cam_ascii"]]      if cameras else 1
+            wire_cam        = cameras[state["cam_wire"]]       if cameras else 1
+            poll_cam        = cameras[state["cam_poll"]]       if cameras else 1
+            fruit_cam       = cameras[state["cam_fruit"]]      if cameras else 1
+            monkey_cam      = cameras[state["cam_monkey"]]     if cameras else 1
+            gif_slider_cam  = cameras[state["cam_gif_slider"]] if cameras else 1
 
             if prog_id == "ascii":
                 launch_ascii(ascii_cam, mon, monitors)
@@ -455,6 +469,8 @@ def main():
                 launch_fruit(fruit_cam, mon, monitors)
             elif prog_id == "monkey":
                 launch_monkey(monkey_cam, mon, monitors)
+            elif prog_id == "gif_slider":
+                launch_gif_slider(gif_slider_cam, mon, monitors)
 
             state["section"] = "prog"
 
