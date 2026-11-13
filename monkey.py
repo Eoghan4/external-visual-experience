@@ -202,6 +202,74 @@ class Banana:
         return False
 
 
+# ── Pose → estimated head position ────────────────────────────────────────────
+# MediaPipe pose landmark indices
+_POSE_NOSE        = 0
+_POSE_LEFT_EAR    = 7
+_POSE_RIGHT_EAR   = 8
+_POSE_LEFT_SHOULDER  = 11
+_POSE_RIGHT_SHOULDER = 12
+
+def _pose_head_params(lms, fw, fh):
+    """
+    Estimate head centre + size from pose landmarks when no face is detected.
+    Returns (cx, cy, size, angle_deg) or None if landmarks aren't visible enough.
+    """
+    def pt(i):
+        lm = lms[i]
+        return lm.x * fw, lm.y * fh, lm.visibility
+
+    nx, ny, nv = pt(_POSE_NOSE)
+    lsx, lsy, lsv = pt(_POSE_LEFT_SHOULDER)
+    rsx, rsy, rsv = pt(_POSE_RIGHT_SHOULDER)
+    lex, ley, lev = pt(_POSE_LEFT_EAR)
+    rex, rey, rev = pt(_POSE_RIGHT_EAR)
+
+    # Need at least the nose or both ears with some confidence
+    if nv < VIS_MIN and (lev < VIS_MIN or rev < VIS_MIN):
+        return None
+
+    # Shoulder midpoint gives us a reference for scale
+    if lsv >= VIS_MIN and rsv >= VIS_MIN:
+        shoulder_span = math.hypot(rsx - lsx, rsy - lsy)
+        smx = (lsx + rsx) / 2
+        smy = (lsy + rsy) / 2
+    else:
+        return None
+
+    # Head centre: slightly above nose (nose is mid-face, push up ~20% of shoulder span)
+    if nv >= VIS_MIN:
+        cx = nx
+        cy = ny - shoulder_span * 0.18
+    elif lev >= VIS_MIN and rev >= VIS_MIN:
+        cx = (lex + rex) / 2
+        cy = (ley + rey) / 2
+    else:
+        return None
+
+    # Size: bump scale so the mask fills the head generously
+    size = int(shoulder_span * 1.1)
+    if size < 10:
+        return None
+
+    # Roll angle from ear-to-ear line, or zero if ears not visible.
+    # Add 180° to correct the inversion that occurs when deriving angle
+    # from pose ear landmarks on a mirrored feed (face landmarker handles
+    # this internally; pose does not).
+    if lev >= VIS_MIN and rev >= VIS_MIN:
+        angle_deg = -math.degrees(math.atan2(rey - ley, rex - lex)) + 180.0
+    else:
+        angle_deg = 180.0
+
+    return int(cx), int(cy), size, angle_deg
+
+
+def _face_nose_pos(lms, fw, fh):
+    """Return (x, y) of the nose tip for a face landmark result."""
+    lm = lms[_NOSE_TIP]
+    return lm.x * fw, lm.y * fh
+
+
 # ── Drawing ────────────────────────────────────────────────────────────────────
 def _draw_text(img, text, x, y, scale, color, thickness=1):
     cv2.putText(img, text, (x, y), FONT, scale, (0, 0, 0),   thickness + 2, cv2.LINE_AA)
@@ -231,10 +299,31 @@ def draw_frame(img, bananas, face_result, pose_result):
         cx, cy = int(b.x), int(b.y)
         _paste_bgra(img, rs, cx - diag // 2, cy - diag // 2)
 
-    # ── Monkey masks ──────────────────────────────────────────────────────────
+    # ── Monkey masks — face-detected people ──────────────────────────────────
+    # Collect face nose positions to avoid double-drawing on same person
+    face_noses = [_face_nose_pos(lms, fw, fh) for lms in face_result.face_landmarks]
+
     for lms in face_result.face_landmarks:
         cx, cy, size, angle = _face_params(lms, fw, fh)
         _overlay_sprite(img, _monkey_src, cx, cy, size, angle)
+
+    # ── Monkey masks — pose-only people (face not detected) ───────────────────
+    for pose_lms in pose_result.pose_landmarks:
+        params = _pose_head_params(pose_lms, fw, fh)
+        if params is None:
+            continue
+        pcx, pcy, psize, pangle = params
+
+        # Skip if there's already a face detection close to this pose's head
+        too_close = False
+        for fnx, fny in face_noses:
+            if math.hypot(pcx - fnx, pcy - fny) < psize * 0.6:
+                too_close = True
+                break
+        if too_close:
+            continue
+
+        _overlay_sprite(img, _monkey_src, pcx, pcy, psize, pangle)
 
 
 # ── Score window ───────────────────────────────────────────────────────────────

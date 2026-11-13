@@ -143,12 +143,6 @@ PROGRAMMES = [
         "detail": "Two OpenCV windows  │  Q to stop",
     },
     {
-        "id":     "fruit",
-        "name":   "FRUIT NINJA",
-        "desc":   "Swipe arms to slice flying fruit — avoid bombs",
-        "detail": "Two OpenCV windows  │  Q to stop",
-    },
-    {
         "id":     "monkey",
         "name":   "MONKEY MODE",
         "desc":   "Monkey masks on faces, catch falling bananas with your body",
@@ -160,6 +154,12 @@ PROGRAMMES = [
         "desc":   "Before/after GIF comparison — move hand left/right to slide",
         "detail": "One OpenCV window  │  Q to stop",
     },
+    {
+        "id":     "glitch",
+        "name":   "GLITCH CAM",
+        "desc":   "Live feed with pixel-sort, datamosh, chromatic split & more",
+        "detail": "One OpenCV window  │  E to cycle effects  │  Q to stop",
+    },
 ]
 
 # Which section the cursor is in: "prog" | "cam_ascii" | "cam_wire" | "display"
@@ -168,9 +168,9 @@ SECTION_ORDER = {
     "ascii":      ["prog", "cam_ascii",      "display"],
     "wire":       ["prog", "cam_wire",       "display"],
     "poll":       ["prog", "cam_poll",       "display"],
-    "fruit":      ["prog", "cam_fruit",      "display"],
     "monkey":     ["prog", "cam_monkey",     "display"],
     "gif_slider": ["prog", "cam_gif_slider", "display"],
+    "glitch":     ["prog", "cam_glitch",     "display"],
 }
 
 
@@ -233,9 +233,9 @@ def render(state):
         lines.append(f"  {YELLOW}⚠  No cameras detected.{RESET}")
         lines.append("")
     else:
-        cam_sections = [s for s in ["cam_ascii", "cam_wire", "cam_poll", "cam_fruit", "cam_monkey", "cam_gif_slider"] if s in sections]
-        cam_labels   = {"cam_ascii": "ASCII CAM CAMERA", "cam_wire": "WIREFRAME CAMERA", "cam_poll": "POLL CAMERA", "cam_fruit": "FRUIT NINJA CAMERA", "cam_monkey": "MONKEY MODE CAMERA", "cam_gif_slider": "GIF SLIDER CAMERA"}
-        cam_keys     = {"cam_ascii": "cam_ascii", "cam_wire": "cam_wire", "cam_poll": "cam_poll", "cam_fruit": "cam_fruit", "cam_monkey": "cam_monkey", "cam_gif_slider": "cam_gif_slider"}
+        cam_sections = [s for s in ["cam_ascii", "cam_wire", "cam_poll", "cam_monkey", "cam_gif_slider", "cam_glitch"] if s in sections]
+        cam_labels   = {"cam_ascii": "ASCII CAM CAMERA", "cam_wire": "WIREFRAME CAMERA", "cam_poll": "POLL CAMERA", "cam_monkey": "MONKEY MODE CAMERA", "cam_gif_slider": "GIF SLIDER CAMERA", "cam_glitch": "GLITCH CAM CAMERA"}
+        cam_keys     = {"cam_ascii": "cam_ascii", "cam_wire": "cam_wire", "cam_poll": "cam_poll", "cam_monkey": "cam_monkey", "cam_gif_slider": "cam_gif_slider", "cam_glitch": "cam_glitch"}
 
         for sec_key in cam_sections:
             sec_active = active == sec_key
@@ -354,11 +354,6 @@ def launch_poll(camera_idx, left_choice, right_choice, monitor=None, monitors=No
     )
 
 
-def launch_fruit(camera_idx, monitor=None, monitors=None):
-    script = os.path.join(SCRIPT_DIR, "fruit_ninja.py")
-    _open_new_window("Fruit Ninja", script, ["--camera", str(camera_idx)], monitor, monitors)
-
-
 def launch_monkey(camera_idx, monitor=None, monitors=None):
     script = os.path.join(SCRIPT_DIR, "monkey.py")
     _open_new_window("Monkey Mode", script, ["--camera", str(camera_idx)], monitor, monitors)
@@ -367,6 +362,11 @@ def launch_monkey(camera_idx, monitor=None, monitors=None):
 def launch_gif_slider(camera_idx, monitor=None, monitors=None):
     script = os.path.join(SCRIPT_DIR, "gif_slider.py")
     _open_new_window("GIF Slider", script, ["--camera", str(camera_idx)], monitor, monitors)
+
+
+def launch_glitch(camera_idx, monitor=None, monitors=None):
+    script = os.path.join(SCRIPT_DIR, "glitch_cam.py")
+    _open_new_window("GLITCH CAM", script, ["--camera", str(camera_idx)], monitor, monitors)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -391,9 +391,9 @@ def main():
         "cam_ascii":      default_pos,
         "cam_wire":       default_pos,
         "cam_poll":       default_pos,
-        "cam_fruit":      default_pos,
         "cam_monkey":     default_pos,
         "cam_gif_slider": default_pos,
+        "cam_glitch":     default_pos,
         "display":    0,
         "section":    "prog",
         "cameras":    cameras,
@@ -429,7 +429,7 @@ def main():
                 state["prog"] = (state["prog"] + 1) % len(PROGRAMMES)
                 state["section"] = "prog"
 
-        elif cur in ("cam_ascii", "cam_wire", "cam_poll", "cam_fruit", "cam_monkey", "cam_gif_slider"):
+        elif cur in ("cam_ascii", "cam_wire", "cam_poll", "cam_monkey", "cam_gif_slider", "cam_glitch"):
             if key == "LEFT":
                 state[cur] = (state[cur] - 1) % len(cameras)
             elif key == "RIGHT":
@@ -447,9 +447,9 @@ def main():
             ascii_cam       = cameras[state["cam_ascii"]]      if cameras else 1
             wire_cam        = cameras[state["cam_wire"]]       if cameras else 1
             poll_cam        = cameras[state["cam_poll"]]       if cameras else 1
-            fruit_cam       = cameras[state["cam_fruit"]]      if cameras else 1
             monkey_cam      = cameras[state["cam_monkey"]]     if cameras else 1
             gif_slider_cam  = cameras[state["cam_gif_slider"]] if cameras else 1
+            glitch_cam      = cameras[state["cam_glitch"]]     if cameras else 1
 
             if prog_id == "ascii":
                 launch_ascii(ascii_cam, mon, monitors)
@@ -465,12 +465,12 @@ def main():
                 print(f"\n  {DARK_GRAY}Launching poll...{RESET}\n")
                 launch_poll(poll_cam, left_choice, right_choice, mon, monitors)
                 print(HIDE_CURSOR, end="", flush=True)
-            elif prog_id == "fruit":
-                launch_fruit(fruit_cam, mon, monitors)
             elif prog_id == "monkey":
                 launch_monkey(monkey_cam, mon, monitors)
             elif prog_id == "gif_slider":
                 launch_gif_slider(gif_slider_cam, mon, monitors)
+            elif prog_id == "glitch":
+                launch_glitch(glitch_cam, mon, monitors)
 
             state["section"] = "prog"
 
