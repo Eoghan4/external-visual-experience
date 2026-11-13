@@ -160,7 +160,15 @@ PROGRAMMES = [
         "desc":   "Live feed with pixel-sort, datamosh, chromatic split & more",
         "detail": "One OpenCV window  │  E to cycle effects  │  Q to stop",
     },
+    {
+        "id":     "dvd",
+        "name":   "DVD BOUNCE",
+        "desc":   "Image bounces around the screen, changes colour on each wall hit",
+        "detail": "One OpenCV window  │  Q or Esc to stop",
+    },
 ]
+
+DVD_BG_OPTIONS = ["Black background", "Transparent (overlay)"]
 
 # Which section the cursor is in: "prog" | "cam_ascii" | "cam_wire" | "display"
 # Navigation order depends on selected programme.
@@ -171,6 +179,7 @@ SECTION_ORDER = {
     "monkey":     ["prog", "cam_monkey",     "display"],
     "gif_slider": ["prog", "cam_gif_slider", "display"],
     "glitch":     ["prog", "cam_glitch",     "display"],
+    "dvd":        ["prog", "dvd_bg",         "display"],
 }
 
 
@@ -260,6 +269,30 @@ def render(state):
             lines.append(f"{DARK_GRAY}│{RESET}")
             lines.append(hline(w, "╚", "─", "╝", color=DARK_GRAY))
             lines.append("")
+
+    # ── DVD background section ───────────────────────────────────────────────
+    if "dvd_bg" in sections:
+        sec_active = active == "dvd_bg"
+        hint = "← → select" if sec_active else "Tab to focus"
+        lines.append(hline(w, "╔", "─", "╗", color=DARK_GRAY))
+        lines.append(
+            f"{DARK_GRAY}│{RESET}  "
+            f"{BOLD}{WHITE if sec_active else DARK_GRAY}BACKGROUND{RESET}"
+            f"  {DARK_GRAY}({hint}){RESET}"
+        )
+        lines.append(f"{DARK_GRAY}│{RESET}")
+        for i, opt in enumerate(DVD_BG_OPTIONS):
+            is_sel = i == state["dvd_bg"]
+            if is_sel and sec_active:
+                indicator = f"  {BRIGHT_CYAN}▶ {BOLD}{opt}{RESET}"
+            elif is_sel:
+                indicator = f"  {DARK_GRAY}▶ {opt}{RESET}"
+            else:
+                indicator = f"    {DARK_GRAY}{opt}{RESET}"
+            lines.append(f"{DARK_GRAY}│{RESET}{indicator}")
+        lines.append(f"{DARK_GRAY}│{RESET}")
+        lines.append(hline(w, "╚", "─", "╝", color=DARK_GRAY))
+        lines.append("")
 
     # ── Display section ──────────────────────────────────────────────────────
     monitors = state["monitors"]
@@ -369,6 +402,12 @@ def launch_glitch(camera_idx, monitor=None, monitors=None):
     _open_new_window("GLITCH CAM", script, ["--camera", str(camera_idx)], monitor, monitors)
 
 
+def launch_dvd(monitor=None, monitors=None, transparent=False):
+    script = os.path.join(SCRIPT_DIR, "dvd_bounce.py")
+    extra  = ["--transparent"] if transparent else []
+    _open_new_window("DVD Bounce", script, extra, monitor, monitors)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     enable_ansi()
@@ -394,6 +433,7 @@ def main():
         "cam_monkey":     default_pos,
         "cam_gif_slider": default_pos,
         "cam_glitch":     default_pos,
+        "dvd_bg":     0,
         "display":    0,
         "section":    "prog",
         "cameras":    cameras,
@@ -435,6 +475,10 @@ def main():
             elif key == "RIGHT":
                 state[cur] = (state[cur] + 1) % len(cameras)
 
+        elif cur == "dvd_bg":
+            if key in ("LEFT", "RIGHT"):
+                state["dvd_bg"] = (state["dvd_bg"] + 1) % len(DVD_BG_OPTIONS)
+
         elif cur == "display":
             if key == "LEFT":
                 state["display"] = (state["display"] - 1) % len(monitors)
@@ -471,6 +515,9 @@ def main():
                 launch_gif_slider(gif_slider_cam, mon, monitors)
             elif prog_id == "glitch":
                 launch_glitch(glitch_cam, mon, monitors)
+            elif prog_id == "dvd":
+                transparent = state["dvd_bg"] == 1
+                launch_dvd(mon, monitors, transparent=transparent)
 
             state["section"] = "prog"
 
