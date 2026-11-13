@@ -11,6 +11,10 @@ import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--camera", type=int, default=1)
+parser.add_argument("--mon-x",  type=int, default=None)
+parser.add_argument("--mon-y",  type=int, default=None)
+parser.add_argument("--mon-w",  type=int, default=None)
+parser.add_argument("--mon-h",  type=int, default=None)
 _args = parser.parse_args()
 
 cap = cv2.VideoCapture(_args.camera, cv2.CAP_DSHOW)
@@ -18,7 +22,21 @@ cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
 cv2.namedWindow("GLITCH CAM", cv2.WINDOW_NORMAL)
-cv2.setWindowProperty("GLITCH CAM", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+if _args.mon_x is not None:
+    import ctypes
+    mw = _args.mon_w or 1280
+    mh = _args.mon_h or 720
+    cv2.moveWindow("GLITCH CAM", _args.mon_x, _args.mon_y)
+    cv2.resizeWindow("GLITCH CAM", mw, mh)
+    # Give the WM a moment then force fullscreen on that monitor
+    cv2.waitKey(1)
+    hwnd = ctypes.windll.user32.FindWindowW(None, "GLITCH CAM")
+    if hwnd:
+        ctypes.windll.user32.MoveWindow(hwnd, _args.mon_x, _args.mon_y, mw, mh, True)
+    cv2.setWindowProperty("GLITCH CAM", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+else:
+    cv2.setWindowProperty("GLITCH CAM", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 EFFECTS = [
     "PIXEL SORT",

@@ -18,7 +18,17 @@ parser.add_argument("--width",       type=int,   default=1280)
 parser.add_argument("--height",      type=int,   default=720)
 parser.add_argument("--size",        type=int,   default=400, help="Logo width in pixels")
 parser.add_argument("--transparent", action="store_true", help="Float logo over desktop with transparent background")
+parser.add_argument("--mon-x",       type=int,   default=None)
+parser.add_argument("--mon-y",       type=int,   default=None)
+parser.add_argument("--mon-w",       type=int,   default=None)
+parser.add_argument("--mon-h",       type=int,   default=None)
 args = parser.parse_args()
+
+# If monitor dimensions were passed, use them as the canvas size
+if args.mon_w:
+    args.width  = args.mon_w
+if args.mon_h:
+    args.height = args.mon_h
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -118,7 +128,9 @@ if args.transparent:
     root.overrideredirect(True)                        # no title bar / borders
     root.attributes("-topmost", True)                  # always on top
     root.attributes("-transparentcolor", CHROMA)       # punch holes where black is
-    root.geometry(f"{W}x{H}+0+0")
+    win_x = args.mon_x if args.mon_x is not None else 0
+    win_y = args.mon_y if args.mon_y is not None else 0
+    root.geometry(f"{W}x{H}+{win_x}+{win_y}")
     root.configure(bg=CHROMA)
 
     canvas_tk = tk.Canvas(root, width=W, height=H,
@@ -193,7 +205,18 @@ else:
 
     WIN = "DVD Bounce"
     cv2.namedWindow(WIN, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(WIN, W, H)
+
+    if args.mon_x is not None:
+        import ctypes
+        cv2.moveWindow(WIN, args.mon_x, args.mon_y)
+        cv2.resizeWindow(WIN, W, H)
+        cv2.waitKey(1)
+        hwnd = ctypes.windll.user32.FindWindowW(None, WIN)
+        if hwnd:
+            ctypes.windll.user32.MoveWindow(hwnd, args.mon_x, args.mon_y, W, H, True)
+        cv2.setWindowProperty(WIN, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    else:
+        cv2.resizeWindow(WIN, W, H)
     canvas = np.zeros((H, W, 3), dtype=np.uint8)
 
     while True:

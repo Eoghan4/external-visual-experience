@@ -8,7 +8,6 @@ import ctypes.wintypes
 import os
 import subprocess
 import sys
-import time
 
 # ── ANSI helpers ────────────────────────────────────────────────────────────
 ESC          = "\x1b"
@@ -330,29 +329,18 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PYTHON     = sys.executable
 
 
-def _move_cv2_window(title, monitor):
-    if sys.platform != "win32":
-        return
-    user32 = ctypes.windll.user32
-    l, t, r, b = monitor
-    for _ in range(40):
-        hwnd = user32.FindWindowW(None, title)
-        if hwnd:
-            user32.MoveWindow(hwnd, l + 40, t + 40, (r - l) - 80, (b - t) - 80, True)
-            return
-        time.sleep(0.1)
-
-
 def _open_new_window(title, script, extra_args, monitor=None, monitors=None):
     """Open a script in a fully detached new cmd window."""
     cam_args = " ".join(extra_args)
-    # Try Windows Terminal first; fall back to cmd /k so the window stays open
     mon_str = ""
+    mon_script_args = ""
     if monitors and monitor is not None and len(monitors) > 1:
-        l, t = monitors[monitor][:2]
+        l, t, r, b = monitors[monitor]
         mon_str = f"--pos {l+40},{t+40} "
-    wt = f'wt.exe {mon_str}-- {PYTHON} "{script}" {cam_args}'
-    cmd = f'start "{title}" cmd /k "{PYTHON}" "{script}" {cam_args}'
+        mon_script_args = f"--mon-x {l} --mon-y {t} --mon-w {r - l} --mon-h {b - t}"
+    full_args = f"{cam_args} {mon_script_args}".strip()
+    wt  = f'wt.exe {mon_str}-- {PYTHON} "{script}" {full_args}'
+    cmd = f'start "{title}" cmd /k "{PYTHON}" "{script}" {full_args}'
     try:
         subprocess.Popen(wt, shell=True, cwd=SCRIPT_DIR)
     except Exception:
@@ -365,15 +353,8 @@ def launch_ascii(camera_idx, monitor=None, monitors=None):
 
 
 def launch_wireframe(camera_idx, monitor=None, monitors=None):
-    import threading
     script = os.path.join(SCRIPT_DIR, "wireframe.py")
     _open_new_window("Wireframe", script, ["--camera", str(camera_idx)], monitor, monitors)
-    if monitors and monitor is not None and len(monitors) > 1:
-        threading.Thread(
-            target=_move_cv2_window,
-            args=("Wireframe", monitors[monitor]),
-            daemon=True,
-        ).start()
 
 
 def launch_poll(camera_idx, left_choice, right_choice, monitor=None, monitors=None):

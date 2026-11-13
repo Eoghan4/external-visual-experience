@@ -19,6 +19,10 @@ import numpy as np
 # ── Args ───────────────────────────────────────────────────────────────────────
 parser = argparse.ArgumentParser()
 parser.add_argument("--camera", type=int, default=1)
+parser.add_argument("--mon-x",  type=int, default=None)
+parser.add_argument("--mon-y",  type=int, default=None)
+parser.add_argument("--mon-w",  type=int, default=None)
+parser.add_argument("--mon-h",  type=int, default=None)
 _args = parser.parse_args()
 
 SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
@@ -438,6 +442,19 @@ prev_time     = time.time()
 cv2.namedWindow("Monkey Mode",   cv2.WINDOW_NORMAL)
 cv2.namedWindow("Banana Count",  cv2.WINDOW_NORMAL)
 cv2.resizeWindow("Banana Count", 1920, 1080)
+
+if _args.mon_x is not None:
+    import ctypes
+    mw, mh = _args.mon_w or 1280, _args.mon_h or 720
+    for title in ("Monkey Mode", "Banana Count"):
+        cv2.moveWindow(title, _args.mon_x, _args.mon_y)
+        cv2.resizeWindow(title, mw, mh)
+    cv2.waitKey(1)
+    for title in ("Monkey Mode", "Banana Count"):
+        hwnd = ctypes.windll.user32.FindWindowW(None, title)
+        if hwnd:
+            ctypes.windll.user32.MoveWindow(hwnd, _args.mon_x, _args.mon_y, mw, mh, True)
+        cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 while cap.isOpened():
     ret, frame = cap.read()

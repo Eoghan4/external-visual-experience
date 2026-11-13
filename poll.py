@@ -8,6 +8,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--camera", type=int, default=1)
 parser.add_argument("--left",  type=str, default="LEFT")
 parser.add_argument("--right", type=str, default="RIGHT")
+parser.add_argument("--mon-x",  type=int, default=None)
+parser.add_argument("--mon-y",  type=int, default=None)
+parser.add_argument("--mon-w",  type=int, default=None)
+parser.add_argument("--mon-h",  type=int, default=None)
 _args = parser.parse_args()
 
 LEFT_CHOICE  = _args.left
@@ -266,6 +270,19 @@ poll_canvas = np.zeros((POLL_H, POLL_W, 3), dtype=np.uint8)
 cv2.namedWindow("Poll Results", cv2.WINDOW_NORMAL)
 cv2.resizeWindow("Poll Results", POLL_W, POLL_H)
 cv2.namedWindow("Poll Camera",   cv2.WINDOW_NORMAL)
+
+if _args.mon_x is not None:
+    import ctypes
+    mw, mh = _args.mon_w or 1280, _args.mon_h or 720
+    for title in ("Poll Results", "Poll Camera"):
+        cv2.moveWindow(title, _args.mon_x, _args.mon_y)
+        cv2.resizeWindow(title, mw, mh)
+    cv2.waitKey(1)
+    for title in ("Poll Results", "Poll Camera"):
+        hwnd = ctypes.windll.user32.FindWindowW(None, title)
+        if hwnd:
+            ctypes.windll.user32.MoveWindow(hwnd, _args.mon_x, _args.mon_y, mw, mh, True)
+        cv2.setWindowProperty(title, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 timestamp_ms = 0
 

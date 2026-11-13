@@ -7,6 +7,10 @@ import random
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--camera", type=int, default=1)
+parser.add_argument("--mon-x",  type=int, default=None)
+parser.add_argument("--mon-y",  type=int, default=None)
+parser.add_argument("--mon-w",  type=int, default=None)
+parser.add_argument("--mon-h",  type=int, default=None)
 _args = parser.parse_args()
 
 vision = mp.tasks.vision
@@ -44,6 +48,17 @@ cap = cv2.VideoCapture(_args.camera)
 timestamp_ms = 0
 
 cv2.namedWindow("Wireframe", cv2.WINDOW_NORMAL)
+
+if _args.mon_x is not None:
+    import ctypes
+    mw, mh = _args.mon_w or 1280, _args.mon_h or 720
+    cv2.moveWindow("Wireframe", _args.mon_x, _args.mon_y)
+    cv2.resizeWindow("Wireframe", mw, mh)
+    cv2.waitKey(1)
+    hwnd = ctypes.windll.user32.FindWindowW(None, "Wireframe")
+    if hwnd:
+        ctypes.windll.user32.MoveWindow(hwnd, _args.mon_x, _args.mon_y, mw, mh, True)
+    cv2.setWindowProperty("Wireframe", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 COL_GREEN = (0, 255, 0)
