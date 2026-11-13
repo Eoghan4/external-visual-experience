@@ -318,18 +318,16 @@ def _new_glitch_blocks(w, h):
     return blocks
 
 
-def draw_hud(frame: np.ndarray, label: str) -> np.ndarray:
+def draw_hud(frame: np.ndarray, label: str, hint_extra: str = "") -> np.ndarray:
     out = frame.copy()
     h, w = out.shape[:2]
     font  = cv2.FONT_HERSHEY_SIMPLEX
     fsize = max(0.5, w / 1600)
     thick = 1
 
-    # Bottom-left: effect name
     cv2.putText(out, f"[ {label} ]", (14, h - 16), font, fsize, (0, 255, 0), thick, cv2.LINE_AA)
 
-    # Bottom-right: controls hint
-    hint = "E: next effect   Q: quit"
+    hint = f"E: next effect{hint_extra}   Q: quit"
     (tw, _), _ = cv2.getTextSize(hint, font, fsize * 0.8, thick)
     cv2.putText(out, hint, (w - tw - 14, h - 16), font, fsize * 0.8, (0, 200, 0), thick, cv2.LINE_AA)
 
@@ -380,25 +378,24 @@ while True:
     prev_frame = frame.copy()
 
     hud_label = f"DATAMOSH  {MOSH_MODES[mosh_mode]}" if effect == "DATAMOSH" else effect
-    out = draw_hud(out, hud_label)
+    hint_extra = "   M: sub-mode" if effect == "DATAMOSH" else ""
+    out = draw_hud(out, hud_label, hint_extra)
     cv2.imshow("GLITCH CAM", out)
 
     key = cv2.waitKey(1) & 0xFF
     if key in (ord('q'), ord('Q'), 27):
         break
     if key in (ord('e'), ord('E')):
-        if effect == "DATAMOSH":
-            # While on datamosh, E cycles sub-modes instead of leaving
-            mosh_mode       = (mosh_mode + 1) % len(MOSH_MODES)
-            prev_gray       = None
-            mosh_buffer     = None
-            mosh_flow_accum = None
-        else:
-            effect_idx    = (effect_idx + 1) % len(EFFECTS)
-            glitch_blocks = []
-            prev_gray     = None
-            mosh_buffer   = None
-            mosh_flow_accum = None
+        effect_idx    = (effect_idx + 1) % len(EFFECTS)
+        glitch_blocks = []
+        prev_gray     = None
+        mosh_buffer   = None
+        mosh_flow_accum = None
+    if key in (ord('m'), ord('M')) and effect == "DATAMOSH":
+        mosh_mode       = (mosh_mode + 1) % len(MOSH_MODES)
+        prev_gray       = None
+        mosh_buffer     = None
+        mosh_flow_accum = None
 
 cap.release()
 cv2.destroyAllWindows()
